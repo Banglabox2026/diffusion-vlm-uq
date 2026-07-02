@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Confidently Wrong · Diffusion-VLM Hallucination Detection</title>
+<meta name="description" content="A free, single-pass denoising-trajectory signal detects hallucinations in diffusion vision-language models where output confidence fails."/>
+<style>
+  :root{
+    --bg:#0b1020; --bg2:#121a33; --card:#151d38; --ink:#e8ecf7; --mut:#9aa6c7;
+    --acc:#4c7cff; --acc2:#00d4b8; --bad:#ff5470; --good:#31d0aa; --line:#26304f;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:linear-gradient(180deg,#0b1020,#0d1428 40%,#0b1020);color:var(--ink);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--acc2);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 22px}
+  section{padding:70px 0;border-top:1px solid var(--line)}
+  h1,h2,h3{line-height:1.2;letter-spacing:-.01em}
+  h2{font-size:clamp(24px,3.4vw,34px);margin:0 0 8px}
+  .kicker{color:var(--acc2);font-family:var(--mono);font-size:13px;text-transform:uppercase;letter-spacing:.14em;margin-bottom:10px}
+  .mut{color:var(--mut)}
+  .center{text-align:center}
+  /* hero */
+  .hero{position:relative;padding:96px 0 80px;text-align:center;border-top:none;overflow:hidden}
+  #heroCanvas{position:absolute;inset:0;width:100%;height:100%;opacity:.35;z-index:0}
+  .hero .wrap{position:relative;z-index:1}
+  .badge{display:inline-block;font-family:var(--mono);font-size:12px;color:var(--acc2);border:1px solid var(--line);background:#0e1630;padding:6px 12px;border-radius:999px;margin-bottom:22px}
+  .hero h1{font-size:clamp(30px,5.4vw,54px);margin:0 auto 18px;max-width:16ch;background:linear-gradient(180deg,#fff,#b9c6f2);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{font-size:clamp(16px,2.1vw,20px);color:var(--mut);max-width:64ch;margin:0 auto 26px}
+  .links a{display:inline-block;margin:6px;padding:10px 18px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:600;font-size:14px}
+  .links a:hover{border-color:var(--acc);text-decoration:none;transform:translateY(-1px)}
+  .links a.primary{background:var(--acc);border-color:var(--acc)}
+  /* stat cards */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;text-align:center}
+  .stat .n{font-size:clamp(26px,4vw,40px);font-weight:800;font-family:var(--mono)}
+  .stat .n.bad{color:var(--bad)} .stat .n.good{color:var(--good)}
+  .stat .l{font-size:13px;color:var(--mut);margin-top:6px}
+  /* generic card */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center}
+  figure{margin:0} img{max-width:100%;border-radius:12px;display:block}
+  figcaption{font-size:13px;color:var(--mut);margin-top:10px}
+  /* teaser */
+  .teaser{display:grid;grid-template-columns:1.1fr 1fr;gap:26px;align-items:center}
+  .scene{background:#0e1630;border:1px solid var(--line);border-radius:16px;padding:22px;position:relative;overflow:hidden}
+  .imgbox{aspect-ratio:16/10;border-radius:12px;background:
+     radial-gradient(120px 90px at 30% 55%,#3a5a3a,transparent 70%),
+     radial-gradient(140px 100px at 70% 45%,#2b3d63,transparent 70%),
+     linear-gradient(160deg,#1a2540,#0e1630);position:relative;border:1px solid var(--line)}
+  .imgbox .obj{position:absolute;font-size:34px}
+  .qa{margin-top:16px;font-size:15px}
+  .qa .q{color:var(--mut)} .qa .a{font-weight:700}
+  .tag{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px}
+  .tag.bad{background:rgba(255,84,112,.15);color:var(--bad);border:1px solid rgba(255,84,112,.4)}
+  .tag.good{background:rgba(49,208,170,.15);color:var(--good);border:1px solid rgba(49,208,170,.4)}
+  /* interactive */
+  .demo{background:#0e1630;border:1px solid var(--line);border-radius:18px;padding:26px}
+  .toggle{display:inline-flex;background:#0b1226;border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:8px}
+  .toggle button{background:transparent;border:0;color:var(--mut);font-family:var(--mono);font-size:13px;padding:8px 16px;border-radius:8px;cursor:pointer}
+  .toggle button.on{background:var(--acc);color:#fff}
+  .toggle button.on.wrong{background:var(--bad)}
+  #trajCanvas,#threeCanvas{width:100%;border-radius:12px;background:#0b1226;border:1px solid var(--line);display:block}
+  .ctrls{display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  .ctrls button{background:var(--card);border:1px solid var(--line);color:var(--ink);padding:9px 16px;border-radius:9px;cursor:pointer;font-weight:600}
+  .ctrls button:hover{border-color:var(--acc)}
+  .readout{font-family:var(--mono);font-size:13px;color:var(--mut)}
+  .readout b{color:var(--ink)}
+  /* table */
+  .tbl{width:100%;border-collapse:collapse;font-size:14px;overflow-x:auto;display:block}
+  .tbl table{width:100%;border-collapse:collapse}
+  table.rt{width:100%;border-collapse:collapse;font-size:14px}
+  table.rt th,table.rt td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:center}
+  table.rt th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  table.rt td:first-child,table.rt th:first-child{text-align:left}
+  table.rt td.win{color:var(--good);font-weight:700}
+  table.rt td.fail{color:var(--bad);font-weight:700}
+  .mono{font-family:var(--mono)}
+  /* method flow */
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .step{flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:6px;position:relative}
+  .step .s{font-family:var(--mono);color:var(--acc2);font-size:12px}
+  .step h4{margin:6px 0 4px;font-size:15px}
+  .step p{margin:0;font-size:13px;color:var(--mut)}
+  .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  .reveal.in{opacity:1;transform:none}
+  pre{background:#0b1226;border:1px solid var(--line);border-radius:12px;padding:18px;overflow-x:auto;font-family:var(--mono);font-size:13px;color:#c8d3f5}
+  footer{padding:50px 0;color:var(--mut);font-size:13px;text-align:center}
+  @media(max-width:820px){.stats{grid-template-columns:repeat(2,1fr)}.grid2,.teaser{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <canvas id="heroCanvas"></canvas>
+  <div class="wrap">
+    <div class="badge">Diffusion VLMs · Hallucination Detection · Under review</div>
+    <h1>Confidently Wrong</h1>
+    <p class="lead">Diffusion vision–language models hallucinate — and their <b>output confidence can be anti-calibrated</b>, most sure exactly when it is wrong. The signal that actually works is <b>free</b>: the model's own <b>denoising trajectory</b>.</p>
+    <div class="links">
+      <a class="primary" href="#demo">▶ See it move</a>
+      <a href="#results">Results</a>
+      <a href="#method">Method</a>
+      <a href="#bibtex">BibTeX</a>
+    </div>
+  </div>
+</header>
+
+<section id="tldr">
+  <div class="wrap">
+    <div class="kicker">The one-line result</div>
+    <h2>A single, training-free number detects hallucinations across three diffusion VLMs.</h2>
+    <p class="mut" style="max-width:70ch">The mean step-wise entropy of the denoising trajectory predicts wrong answers at <b>0.72–0.79 AUROC</b> — while output confidence, the standard reliability knob, drops <b>below chance</b> on LLaDA-V. The trajectory ties confidence where confidence works and dominates it where it fails.</p>
+    <div class="stats" style="margin-top:26px">
+      <div class="stat reveal"><div class="n bad">0.48</div><div class="l">Output confidence AUROC on LLaDA-V (POPE) — <b>below the 0.5 chance line</b></div></div>
+      <div class="stat reveal"><div class="n good">0.78</div><div class="l">Denoising-trajectory AUROC on the same examples — <b>+0.30</b>, free</div></div>
+      <div class="stat reveal"><div class="n">95%</div><div class="l">Accuracy on the reliable <b>50%</b> of POPE when abstaining by the trajectory</div></div>
+      <div class="stat reveal"><div class="n">3</div><div class="l">Diffusion VLMs where the detector holds (0.72–0.79 AUROC)</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="problem">
+  <div class="wrap">
+    <div class="kicker">The problem</div>
+    <h2>The confidence looks trustworthy. That's the danger.</h2>
+    <div class="teaser" style="margin-top:24px">
+      <div class="scene reveal">
+        <div class="imgbox">
+          <span class="obj" style="left:26%;top:48%">🐕</span>
+          <span class="obj" style="left:60%;top:38%">🛋️</span>
+        </div>
+        <div class="qa">
+          <div class="q">Q: “Is there a <b>cat</b> in the image?”</div>
+          <div class="a" style="margin-top:8px">Diffusion VLM: <span class="tag bad">“Yes.”</span> &nbsp;<span class="readout">max-prob 0.94</span></div>
+          <div class="a" style="margin-top:6px">Ground truth: <span class="tag good">No cat</span></div>
+        </div>
+      </div>
+      <div class="reveal">
+        <p>For autoregressive models, high output confidence usually means a safe answer. On a <b>masked-diffusion</b> VLM like LLaDA-V, that intuition <b>inverts</b>: the final distribution is sharp and overconfident <em>even when wrong</em> — its error-detection AUROC sits <b>below chance</b>.</p>
+        <p>But the answer isn't produced in one shot. It's <b>denoised over many steps</b>, and that hidden trajectory records how much the model wrestled with the answer. A confidently-wrong answer leaves a turbulent, high-entropy trail. That trail is free to read.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="wrap">
+    <div class="kicker">Interactive</div>
+    <h2>Watch the denoising trajectory.</h2>
+    <p class="mut">Masked-diffusion decoding fills the answer over <span class="mono">T</span> reverse steps. Toggle between a <b>correct</b> and a <b>hallucinated</b> answer and watch the per-step entropy — the trajectory signal — evolve live.</p>
+    <div class="demo reveal" style="margin-top:20px">
+      <div class="toggle">
+        <button id="btnCorrect" class="on" onclick="setMode('correct')">✓ correct answer</button>
+        <button id="btnWrong" onclick="setMode('wrong')">✗ hallucinated answer</button>
+      </div>
+      <canvas id="trajCanvas" height="360"></canvas>
+      <div class="ctrls">
+        <button onclick="replay()">↻ Replay</button>
+        <span class="readout">mean step-entropy: <b id="roMean">—</b></span>
+        <span class="readout">final confidence (entropy): <b id="roFinal">—</b></span>
+        <span class="readout">verdict: <b id="roVerdict">—</b></span>
+      </div>
+    </div>
+    <p class="mut" style="font-size:13px;margin-top:12px">Top: the answer tokens resolving from <span class="mono">[MASK]</span> across denoising steps. Bottom: the entropy trajectory. A correct answer settles early into a flat, low-entropy path; a hallucination stays turbulent — high mean step-entropy — even though the <em>final</em> token looks just as confident.</p>
+  </div>
+</section>
+
+<section id="mirror">
+  <div class="wrap">
+    <div class="kicker">The mirror</div>
+    <h2>Reliability lives in opposite places for AR vs diffusion.</h2>
+    <div class="grid2" style="margin-top:22px">
+      <figure class="reveal"><img src="assets/fig1_mirror.png" alt="AR vs diffusion mirror bar chart"/>
+        <figcaption>AUROC for predicting a wrong answer (POPE). For an autoregressive VLM (Qwen2-VL) output confidence <b>works</b>; for the diffusion VLM (LLaDA-V) it <b>fails</b> below chance while the denoising trajectory works.</figcaption></figure>
+      <div class="reveal">
+        <p>An AR model commits each token once and writes its uncertainty into the output distribution — so confidence is informative and there is no trajectory to read.</p>
+        <p>A diffusion model repeatedly overwrites tentative tokens; its uncertainty shows up as <b>temporal instability</b>, even when the final distribution is sharp. Output confidence measures the wrong thing; the trajectory measures the right thing — at no extra cost.</p>
+        <p class="mut" style="font-size:13px">95% bootstrap CIs (10k resamples, n=400): trajectory <span class="mono">0.78 [0.71, 0.84]</span> vs confidence <span class="mono">0.50 [0.43, 0.57]</span> — disjoint.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <div class="kicker">Generality</div>
+    <h2>It holds across three diffusion VLMs.</h2>
+    <p class="mut">The trajectory is a <b>strict generalization of confidence</b>: it coincides with confidence when the answer commits in one step, and beats it whenever there is a real denoising trajectory to read.</p>
+    <div class="card reveal" style="margin-top:20px;overflow-x:auto">
+      <table class="rt">
+        <thead><tr><th>Model (diffusion backbone)</th><th>Benchmark</th><th>Output confidence</th><th>Trajectory (ours)</th></tr></thead>
+        <tbody>
+          <tr><td>LLaDA-V (LLaDA-8B)</td><td>POPE</td><td class="fail">0.48</td><td class="win">0.78</td></tr>
+          <tr><td>LLaDA-V (LLaDA-8B)</td><td>GQA</td><td class="fail">0.39</td><td class="win">0.72</td></tr>
+          <tr><td>LaViDa (LLaDA-8B)</td><td>POPE</td><td>0.75</td><td>0.75</td></tr>
+          <tr><td>LaViDa (LLaDA-8B)</td><td>GQA</td><td>0.60</td><td class="win">0.79</td></tr>
+          <tr><td>LaViDa (Dream-7B)</td><td>POPE</td><td>0.74</td><td>0.74</td></tr>
+          <tr><td>LaViDa (Dream-7B)</td><td>GQA</td><td>0.77</td><td>0.75</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mut" style="font-size:13px;margin-top:10px">AUROC for predicting a wrong answer. Green = trajectory wins; red = confidence fails (below/near chance). Where LaViDa commits answers in ~one step, the trajectory correctly reduces to confidence (verified by per-example correlation).</p>
+
+    <div class="grid2" style="margin-top:44px">
+      <figure class="reveal"><img src="assets/fig2_riskcoverage.png" alt="risk coverage curve"/>
+        <figcaption>Selective prediction on POPE. Abstaining by the trajectory (blue) keeps risk far below abstaining by confidence (red): answer the most-reliable 50% at 95% accuracy vs 79%.</figcaption></figure>
+      <div class="reveal">
+        <div class="kicker">Selective prediction</div>
+        <h3 style="margin-top:0">Answer the reliable half at 95%.</h3>
+        <p>Used as a reject option, the trajectory turns a diffusion VLM into a usable selective predictor: at 50% coverage it answers its most-reliable half at <b>95% accuracy</b> (risk 0.05) versus <b>79%</b> for confidence-based abstention. Area-under-risk–coverage: <b>0.072 vs 0.141</b>.</p>
+        <p class="mut" style="font-size:13px">A five-parameter logistic head over the trajectory features also yields a calibrated wrong-probability (ECE 0.063 vs 0.169 for confidence) — no model retraining.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="three">
+  <div class="wrap">
+    <div class="kicker">3D view</div>
+    <h2>The trajectory, in 3D.</h2>
+    <p class="mut">Per-step answer entropy for a correct vs a hallucinated example, as an animated 3D landscape. Drag to rotate.</p>
+    <canvas id="threeCanvas" height="420" class="reveal" style="margin-top:18px"></canvas>
+    <p class="mut" style="font-size:13px;margin-top:10px" id="threeNote">Loading 3D scene…</p>
+  </div>
+</section>
+
+<section id="method">
+  <div class="wrap">
+    <div class="kicker">Method</div>
+    <h2>Free to compute — one forward hook, no retraining.</h2>
+    <div class="flow" style="margin-top:22px">
+      <div class="step reveal"><div class="s">01 · input</div><h4>Image + question</h4><p>A multimodal query answered by a masked-diffusion VLM.</p></div>
+      <div class="step reveal"><div class="s">02 · decode</div><h4>T denoising steps</h4><p>The answer is filled from mask tokens over reverse steps.</p></div>
+      <div class="step reveal"><div class="s">03 · capture</div><h4>Trajectory hook</h4><p>One hook on the LM head logs the per-step distribution — no extra passes.</p></div>
+      <div class="step reveal"><div class="s">04 · score</div><h4>Mean step-entropy</h4><p>Average per-step uncertainty = a training-free error score.</p></div>
+      <div class="step reveal"><div class="s">05 · act</div><h4>Abstain / calibrate</h4><p>Reject unreliable answers or emit a calibrated wrong-probability.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="bibtex">
+  <div class="wrap">
+    <div class="kicker">Cite</div>
+    <h2>BibTeX</h2>
+    <pre>@inproceedings{confidentlywrong,
+  title  = {Confidently Wrong: Catching Hallucinations in Diffusion
+            Vision--Language Models with Free Denoising-Trajectory Uncertainty},
+  author = {Anonymous},
+  note   = {Under review},
+  year   = {2026}
+}</pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Project page for a paper under double-blind review — results are anonymized. Built for review/feedback.<br/>
+    Figures generated from real experiments (LLaDA-V, LaViDa, Qwen2-VL on POPE/GQA).
+  </div>
+</footer>
+
+<script src="app.js"></script>
+<script>
+/* ---------- scroll reveal ---------- */
+const io=new IntersectionObserver((es)=>es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('in')}),{threshold:.14});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>
