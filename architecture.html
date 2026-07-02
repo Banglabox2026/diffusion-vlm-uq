@@ -82,10 +82,19 @@ else (function(){
   function addLabel(text,x,y,z,color,size){const s=label(text,color,size);s.position.set(x,y,z);root.add(s);return s;}
 
   // ---- 1. image (pixels) ----
-  function pixColor(u,v){
-    if(v<0.34){return new THREE.Color().setHSL(0.28,0.5,0.34+0.08*Math.random());}      // grass
-    const dx=u-0.72,dy=v-0.72; if(dx*dx+dy*dy<0.03)return new THREE.Color(0xffcf4a);      // sun
-    return new THREE.Color().setHSL(0.58,0.55,0.5+0.06*(v-0.34));                          // sky
+  function pixColor(u,v){ // a brown DOG on grass under sky (the "no cat" image)
+    const grass=new THREE.Color().setHSL(0.28,0.5,0.34+0.07*Math.random());
+    const sky=new THREE.Color().setHSL(0.58,0.55,0.52+0.05*v);
+    const brown=new THREE.Color(0x8a5a3a), dark=new THREE.Color(0x4a2e1a);
+    if(v<0.30) return grass;
+    if(u>0.58&&u<0.70&&v>0.64&&v<0.80) return dark;                 // ear
+    if(u>0.58&&u<0.88&&v>0.44&&v<0.68){                             // head
+      if(u>0.73&&u<0.80&&v>0.53&&v<0.60) return dark;              // eye
+      return brown;
+    }
+    if(u>0.18&&u<0.66&&v>0.30&&v<0.56) return brown;                // body
+    if(u>0.08&&u<0.20&&v>0.42&&v<0.58) return brown;                // tail
+    return sky;
   }
   const imgG=new THREE.Group(); imgG.position.set(-13,3.2,0); imgG.rotation.y=Math.PI/2; root.add(imgG);
   const NP=9;

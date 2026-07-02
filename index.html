@@ -219,6 +219,21 @@
     </div>
     <p class="mut" style="font-size:13px;margin-top:10px">AUROC for predicting a wrong answer. Green = trajectory wins; red = confidence fails (below/near chance). Where LaViDa commits answers in ~one step, the trajectory correctly reduces to confidence (verified by per-example correlation).</p>
 
+    <h3 style="margin-top:40px">…and across four hallucination benchmarks.</h3>
+    <p class="mut">On LLaDA-V the free trajectory detector beats output confidence on every benchmark we tried — including the harder MME and HallusionBench, where output confidence sits near chance.</p>
+    <div class="card reveal" style="margin-top:16px;overflow-x:auto">
+      <table class="rt">
+        <thead><tr><th>Benchmark (LLaDA-V)</th><th>Output confidence</th><th>Trajectory (ours)</th></tr></thead>
+        <tbody>
+          <tr><td>POPE — object presence</td><td class="fail">0.48</td><td class="win">0.78</td></tr>
+          <tr><td>GQA — compositional</td><td class="fail">0.39</td><td class="win">0.72</td></tr>
+          <tr><td>MME — perception + cognition</td><td>0.56</td><td class="win">0.60</td></tr>
+          <tr><td>HallusionBench</td><td class="fail">0.52</td><td class="win">0.65</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mut" style="font-size:13px;margin-top:10px">AUROC (95% bootstrap CIs) — e.g. HallusionBench: trajectory <span class="mono">0.65 [0.56, 0.73]</span> vs confidence <span class="mono">0.52 [0.43, 0.61]</span>. The trajectory is above chance on all four; confidence is near or below it on three.</p>
+
     <div class="grid2" style="margin-top:44px">
       <figure class="reveal"><img src="assets/fig2_riskcoverage.png" alt="risk coverage curve"/>
         <figcaption>Selective prediction on POPE. Abstaining by the trajectory (blue) keeps risk far below abstaining by confidence (red): answer the most-reliable 50% at 95% accuracy vs 79%.</figcaption></figure>
