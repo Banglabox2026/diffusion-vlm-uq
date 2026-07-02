@@ -81,14 +81,21 @@ else (function(){
   function stack(x,n,color,label_){const gs=[];for(let i=0;i<n;i++)gs.push(slab(x,0.6+i*1.05,0,2.4,0.8,3.2,color,0.82));return gs;}
   function addLabel(text,x,y,z,color,size){const s=label(text,color,size);s.position.set(x,y,z);root.add(s);return s;}
 
-  // ---- 1. image (patch grid) ----
-  const imgG=new THREE.Group(); imgG.position.set(-13,3.2,0); root.add(imgG);
-  for(let i=0;i<4;i++)for(let j=0;j<4;j++){
-    const col=new THREE.Color().setHSL(0.58-0.03*i,0.5,0.4+0.05*j);
-    const m=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.6,0.18),new THREE.MeshLambertMaterial({color:col}));
-    m.position.set((j-1.5)*0.68,(i-1.5)*0.68,0); imgG.add(m);
+  // ---- 1. image (pixels) ----
+  function pixColor(u,v){
+    if(v<0.34){return new THREE.Color().setHSL(0.28,0.5,0.34+0.08*Math.random());}      // grass
+    const dx=u-0.72,dy=v-0.72; if(dx*dx+dy*dy<0.03)return new THREE.Color(0xffcf4a);      // sun
+    return new THREE.Color().setHSL(0.58,0.55,0.5+0.06*(v-0.34));                          // sky
   }
-  addLabel("input image",-13,6.0,0,"#9aa6c7",40);
+  const imgG=new THREE.Group(); imgG.position.set(-13,3.2,0); imgG.rotation.y=Math.PI/2; root.add(imgG);
+  const NP=9;
+  for(let i=0;i<NP;i++)for(let j=0;j<NP;j++){
+    const u=j/(NP-1),v=i/(NP-1);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(0.44,0.44,0.24),new THREE.MeshLambertMaterial({color:pixColor(u,v)}));
+    m.position.set((j-NP/2+0.5)*0.48,(i-NP/2+0.5)*0.48,0); imgG.add(m);
+    const e=new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry),new THREE.LineBasicMaterial({color:0x0a0f1e,transparent:true,opacity:.5})); e.position.copy(m.position); imgG.add(e);
+  }
+  addLabel("image (pixels)",-13,6.4,0,"#9aa6c7",40);
 
   // ---- 2. vision encoder ----
   stack(-9.5,4,0x6f8cff); addLabel("SigLIP-2  vision encoder",-9.5,5.4,0,"#bcccff",42);
@@ -108,9 +115,16 @@ else (function(){
 
   // ---- 5. diffusion transformer ----
   const dif=stack(-1,6,0x3a63d8); addLabel("masked-diffusion transformer   (T reverse steps)",-1,7.2,0,"#c7d0ea",40);
+  // attention: every token attends into the transformer (bidirectional)
+  const attnMat=new THREE.LineBasicMaterial({color:0x3f5aa8,transparent:true,opacity:.24});
+  toks.forEach(tk=>{const g=new THREE.BufferGeometry().setFromPoints([tk.position.clone(),new THREE.Vector3(-1,0.6,tk.position.z)]);root.add(new THREE.Line(g,attnMat));});
 
   // ---- 6. LM head ----
-  slab(3.2,1.2,0,1.2,2.0,3.0,0x31d0aa,0.95); addLabel("LM head",3.2,2.7,0,"#8bf0cf",40);
+  slab(3.2,1.2,0,1.2,2.0,3.0,0x31d0aa,0.95); addLabel("LM head",3.2,2.9,0,"#8bf0cf",40);
+  // LM head output = logit distribution over vocab (predicted token tallest)
+  const alogits=[]; const AN=11, aarg=6;
+  for(let k=0;k<AN;k++){const m=new THREE.Mesh(new THREE.BoxGeometry(0.1,1,0.1),new THREE.MeshBasicMaterial({color:k===aarg?0xffffff:0x8bf0cf,transparent:true,opacity:0.9}));m.position.set(4.15,1.2,(k-AN/2+0.5)*0.16);root.add(m);alogits.push({m,k});}
+  addLabel("logits",4.4,0.2,0,"#8bf0cf",24);
   // ---- 7. answer tokens ----
   const ans=[]; for(let i=0;i<4;i++){const m=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.7,0.7),new THREE.MeshLambertMaterial({color:0x2b3d63}));m.position.set(5.4,0.5,(i-1.5)*0.92);root.add(m);ans.push(m);}
   addLabel("answer",5.4,1.6,0,"#9aa6c7",38);
@@ -175,6 +189,8 @@ else (function(){
     // contribution glow
     const gl=0.7+0.3*Math.sin(t*3); tap.material.opacity=gl; gate.material.opacity=0.6+0.25*Math.sin(t*3+1); ribbon.material.opacity=1;
     link.material.color.setHSL(0.11,1,0.4+0.15*Math.sin(t*4));
+    // LM-head logit distribution shifts; predicted token (argmax) stays tallest
+    const ayb=0.3; alogits.forEach(o=>{const base=o.k===aarg?1.7:0.3; const hh=base+(o.k===aarg?0.2*Math.sin(t*4):0.16*Math.abs(Math.sin(t*2.2+o.k)));o.m.scale.y=hh;o.m.position.y=ayb+hh*0.5;});
     // pulses flow along the path
     pulses.forEach(p=>{p.t=(p.t+0.0016)%1; const seg=p.t*(path.length-1); const i=Math.floor(seg); const f=seg-i; const x=path[i]+(path[Math.min(i+1,path.length-1)]-path[i])*f; p.m.position.set(x,0.5,0); p.m.material.opacity=1;});
     renderer.render(scene,cam); requestAnimationFrame(anim);
