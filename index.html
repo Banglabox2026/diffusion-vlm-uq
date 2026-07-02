@@ -127,22 +127,13 @@
   <div class="wrap">
     <div class="kicker">The problem</div>
     <h2>The confidence looks trustworthy. That's the danger.</h2>
-    <div class="teaser" style="margin-top:24px">
-      <div class="scene reveal">
-        <div class="imgbox">
-          <span class="obj" style="left:26%;top:48%">🐕</span>
-          <span class="obj" style="left:60%;top:38%">🛋️</span>
-        </div>
-        <div class="qa">
-          <div class="q">Q: “Is there a <b>cat</b> in the image?”</div>
-          <div class="a" style="margin-top:8px">Diffusion VLM: <span class="tag bad">“Yes.”</span> &nbsp;<span class="readout">max-prob 0.94</span></div>
-          <div class="a" style="margin-top:6px">Ground truth: <span class="tag good">No cat</span></div>
-        </div>
-      </div>
-      <div class="reveal">
-        <p>For autoregressive models, high output confidence usually means a safe answer. On a <b>masked-diffusion</b> VLM like LLaDA-V, that intuition <b>inverts</b>: the final distribution is sharp and overconfident <em>even when wrong</em> — its error-detection AUROC sits <b>below chance</b>.</p>
-        <p>But the answer isn't produced in one shot. It's <b>denoised over many steps</b>, and that hidden trajectory records how much the model wrestled with the answer. A confidently-wrong answer leaves a turbulent, high-entropy trail. That trail is free to read.</p>
-      </div>
+    <figure class="reveal" style="margin-top:24px">
+      <img src="assets/teaser.png" alt="Teaser: the problem, the free denoising-trajectory signal, and the payoff"/>
+      <figcaption><b>Figure 1.</b> <b>Left:</b> a masked-diffusion VLM answers a hallucination probe confidently but wrong. <b>Middle:</b> the free denoising-trajectory signal — a correct answer settles into a flat, low-entropy path, while a hallucination stays turbulent, even though the final token is just as confident. <b>Right:</b> abstaining by the trajectory answers the most-reliable half of POPE at 95% accuracy vs 79% for confidence.</figcaption>
+    </figure>
+    <div class="grid2" style="margin-top:22px">
+      <div class="reveal"><p>For autoregressive models, high output confidence usually means a safe answer. On a <b>masked-diffusion</b> VLM like LLaDA-V, that intuition <b>inverts</b>: the final distribution is sharp and overconfident <em>even when wrong</em> — its error-detection AUROC sits <b>below chance</b>.</p></div>
+      <div class="reveal"><p>But the answer isn't produced in one shot. It's <b>denoised over many steps</b>, and that hidden trajectory records how much the model wrestled with the answer. A confidently-wrong answer leaves a turbulent, high-entropy trail — and it's free to read.</p></div>
     </div>
   </div>
 </section>
@@ -232,13 +223,10 @@
   <div class="wrap">
     <div class="kicker">Method</div>
     <h2>Free to compute — one forward hook, no retraining.</h2>
-    <div class="flow" style="margin-top:22px">
-      <div class="step reveal"><div class="s">01 · input</div><h4>Image + question</h4><p>A multimodal query answered by a masked-diffusion VLM.</p></div>
-      <div class="step reveal"><div class="s">02 · decode</div><h4>T denoising steps</h4><p>The answer is filled from mask tokens over reverse steps.</p></div>
-      <div class="step reveal"><div class="s">03 · capture</div><h4>Trajectory hook</h4><p>One hook on the LM head logs the per-step distribution — no extra passes.</p></div>
-      <div class="step reveal"><div class="s">04 · score</div><h4>Mean step-entropy</h4><p>Average per-step uncertainty = a training-free error score.</p></div>
-      <div class="step reveal"><div class="s">05 · act</div><h4>Abstain / calibrate</h4><p>Reject unreliable answers or emit a calibrated wrong-probability.</p></div>
-    </div>
+    <figure class="reveal" style="margin-top:22px">
+      <img src="assets/pipeline.png" alt="Method pipeline: image+question, masked-diffusion decoding, forward-hook per-step entropy, mean step-entropy score, abstain/calibrate"/>
+      <figcaption><b>Figure 2.</b> The detector reads the denoising trajectory the model already produces: a single forward hook logs the per-step answer distribution, whose mean entropy is a training-free error score used to abstain or emit a calibrated wrong-probability. No retraining, no extra forward passes.</figcaption>
+    </figure>
   </div>
 </section>
 
