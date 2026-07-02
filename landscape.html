@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Denoising entropy landscape (3D)</title>
+<style>
+  html,body{margin:0;height:100%;background:#070b18;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  #c{position:fixed;inset:0;display:block}
+  .ui{position:fixed;z-index:2}
+  #tg{top:14px;left:14px;display:inline-flex;background:rgba(12,18,38,.7);border:1px solid #26304f;border-radius:10px;padding:4px;backdrop-filter:blur(6px)}
+  #tg button{background:transparent;border:0;color:#9aa6c7;font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:7px 13px;border-radius:7px;cursor:pointer}
+  #tg button.on{background:#31d0aa;color:#04211a} #tg button.on.w{background:#ff5470;color:#2a0710}
+  #ax{bottom:14px;left:14px;color:#9aa6c7;font-size:11.5px;font-family:ui-monospace,Menlo,monospace;line-height:1.6;background:rgba(12,18,38,.6);border:1px solid #26304f;border-radius:10px;padding:9px 12px}
+  #ax b{color:#e8ecf7}
+  #err{position:fixed;inset:0;display:none;place-items:center;color:#9aa6c7;text-align:center;padding:24px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="tg"><button id="bC" class="on">✓ correct</button><button id="bW">✗ hallucinated</button></div>
+<div class="ui" id="ax">X <b>answer position</b> · Z <b>denoising step →</b> · Y <b>entropy</b><br/>drag rotate · scroll zoom · surface morphs as it denoises</div>
+<div id="err">Open in a browser with internet to load the 3D engine.</div>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script>
+if(!window.THREE){document.getElementById('err').style.display='grid';}
+else (function(){
+  const cv=document.getElementById('c');
+  const renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true}); renderer.setPixelRatio(Math.min(2,devicePixelRatio||1));
+  const scene=new THREE.Scene(); scene.background=new THREE.Color(0x070b18);
+  const cam=new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 200);
+  scene.add(new THREE.AmbientLight(0xffffff,.7));
+  const d=new THREE.DirectionalLight(0xffffff,.9); d.position.set(6,14,8); scene.add(d);
+
+  const NX=28, NZ=40, W=18, D=20;
+  const geo=new THREE.PlaneGeometry(W,D,NX,NZ); geo.rotateX(-Math.PI/2);
+  const pos=geo.attributes.position; const n=pos.count;
+  const colors=new Float32Array(n*3); geo.setAttribute('color',new THREE.BufferAttribute(colors,3));
+  const mat=new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide,transparent:true,opacity:0.96});
+  const surf=new THREE.Mesh(geo,mat); scene.add(surf);
+  const wire=new THREE.Mesh(geo,new THREE.MeshBasicMaterial({color:0xffffff,wireframe:true,transparent:true,opacity:0.06})); scene.add(wire);
+
+  let mode=0, mix=0; // 0 correct, 1 wrong ; mix eases toward mode
+  function heightAt(u,v,t){ // u=position[0..1], v=step[0..1]
+    const corr=Math.max(0.05, 1.15*Math.exp(-3.0*v) + 0.05*Math.sin(u*9+t))*(0.9+0.15*Math.sin(u*6));
+    let wr=0.9 + 0.33*Math.sin(6*v+3*u+t*0.6) + 0.16*Math.sin(13*v+t) - 0.45*Math.pow(v,4);
+    wr=Math.max(0.12,wr);
+    return corr*(1-mix)+wr*mix;
+  }
+  const lo=new THREE.Color(0x18b57e), mid=new THREE.Color(0xffcf5a), hi=new THREE.Color(0xff5470);
+  const cc=new THREE.Color();
+  function update(t){
+    mix += (mode-mix)*0.06;
+    for(let i=0;i<n;i++){
+      const x=pos.getX(i), z=pos.getZ(i);
+      const u=(x+W/2)/W, v=(z+D/2)/D;
+      const h=heightAt(u,v,t)*2.4; pos.setY(i,h);
+      // color by normalized height
+      const f=Math.min(1,h/3.6);
+      if(f<0.5)cc.copy(lo).lerp(mid,f*2); else cc.copy(mid).lerp(hi,(f-0.5)*2);
+      colors[i*3]=cc.r; colors[i*3+1]=cc.g; colors[i*3+2]=cc.b;
+    }
+    pos.needsUpdate=true; geo.attributes.color.needsUpdate=true; geo.computeVertexNormals();
+  }
+
+  // orbit
+  let radius=26, theta=0.7, phi=1.0, drag=false, px=0, py=0, auto=true;
+  const target=new THREE.Vector3(0,2.5,0);
+  function camU(){cam.position.set(target.x+radius*Math.sin(phi)*Math.cos(theta),target.y+radius*Math.cos(phi),target.z+radius*Math.sin(phi)*Math.sin(theta));cam.lookAt(target);}
+  cv.addEventListener('pointerdown',e=>{drag=true;px=e.clientX;py=e.clientY;auto=false;});
+  addEventListener('pointerup',()=>drag=false);
+  addEventListener('pointermove',e=>{if(!drag)return;theta+=(e.clientX-px)*0.006;phi=Math.max(0.3,Math.min(1.4,phi+(e.clientY-py)*0.005));px=e.clientX;py=e.clientY;});
+  cv.addEventListener('wheel',e=>{e.preventDefault();radius=Math.max(14,Math.min(44,radius+e.deltaY*0.02));},{passive:false});
+  function rs(){renderer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();} addEventListener('resize',rs); rs();
+  document.getElementById('bC').onclick=e=>{mode=0;e.target.className='on';document.getElementById('bW').className='';};
+  document.getElementById('bW').onclick=e=>{mode=1;e.target.className='on w';document.getElementById('bC').className='';};
+
+  const t0=performance.now();
+  function anim(){const t=(performance.now()-t0)/1000; if(auto)theta+=0.0018; update(t); camU(); renderer.render(scene,cam); requestAnimationFrame(anim);}
+  anim();
+})();
+</script>
+</body>
+</html>
