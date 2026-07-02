@@ -237,10 +237,12 @@
   <div class="wrap">
     <div class="kicker">Method</div>
     <h2>Free to compute — one forward hook, no retraining.</h2>
-    <figure class="reveal" style="margin-top:22px">
-      <img src="assets/pipeline.png" alt="Method pipeline: image+question, masked-diffusion decoding, forward-hook per-step entropy, mean step-entropy score, abstain/calibrate"/>
-      <figcaption><b>Figure 2.</b> The detector reads the denoising trajectory the model already produces: a single forward hook logs the per-step answer distribution, whose mean entropy is a training-free error score used to abstain or emit a calibrated wrong-probability. No retraining, no extra forward passes.</figcaption>
-    </figure>
+    <div class="embed2" style="margin-top:22px">
+      <figure>
+        <iframe src="method3d.html" title="3D detection-method pipeline"></iframe>
+        <figcaption><b>Figure 2 (interactive).</b> The detection method as a 3D pipeline: image + question → masked-diffusion decoding (T steps) → the free <b style="color:#ffb648">forward hook</b> → mean step-entropy error score → abstain / calibrate gate. A single hook logs the per-step distribution — no retraining, no extra forward passes. Drag to rotate · scroll to zoom. <a href="assets/pipeline.png" target="_blank" rel="noopener">static diagram ↗</a></figcaption>
+      </figure>
+    </div>
   </div>
 </section>
 
