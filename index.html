@@ -114,6 +114,24 @@
   </div>
 </header>
 
+<section id="explore">
+  <div class="wrap">
+    <div class="kicker">Explore in 3D</div>
+    <h2>The architecture, and the signal, in 3D.</h2>
+    <p class="mut">Two live scenes — drag to rotate, scroll to zoom. First: the full diffusion-VLM pipeline with our contribution highlighted in gold. Below it: the denoising entropy landscape (answer position × step × entropy) morphing as it denoises — toggle correct vs hallucinated.</p>
+    <div class="embed2">
+      <figure>
+        <iframe src="architecture.html" title="3D model architecture"></iframe>
+        <figcaption><b>Model architecture.</b> Image → SigLIP-2 → MLP → masked-diffusion transformer → LM head; our free trajectory-UQ tap in gold. <a href="architecture.html" target="_blank" rel="noopener">open full ↗</a></figcaption>
+      </figure>
+      <figure>
+        <iframe src="landscape.html" title="3D denoising entropy landscape"></iframe>
+        <figcaption><b>Denoising entropy landscape.</b> A correct answer settles into a flat, low surface; a hallucination stays turbulent. <a href="landscape.html" target="_blank" rel="noopener">open full ↗</a></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
 <section id="tldr">
   <div class="wrap">
     <div class="kicker">The one-line result</div>
@@ -214,23 +232,6 @@
   </div>
 </section>
 
-<section id="explore">
-  <div class="wrap">
-    <div class="kicker">Explore in 3D</div>
-    <h2>The architecture, and the signal, in 3D.</h2>
-    <p class="mut">Two live scenes — drag to rotate, scroll to zoom. Left: the full diffusion-VLM pipeline with our contribution highlighted in gold. Right: the denoising entropy landscape (answer position × step × entropy) morphing as it denoises — toggle correct vs hallucinated.</p>
-    <div class="embed2">
-      <figure>
-        <iframe src="architecture.html" title="3D model architecture"></iframe>
-        <figcaption><b>Model architecture.</b> Image → SigLIP-2 → MLP → masked-diffusion transformer → LM head; our free trajectory-UQ tap in gold. <a href="architecture.html" target="_blank" rel="noopener">open full ↗</a></figcaption>
-      </figure>
-      <figure>
-        <iframe src="landscape.html" title="3D denoising entropy landscape"></iframe>
-        <figcaption><b>Denoising entropy landscape.</b> A correct answer settles into a flat, low surface; a hallucination stays turbulent. <a href="landscape.html" target="_blank" rel="noopener">open full ↗</a></figcaption>
-      </figure>
-    </div>
-  </div>
-</section>
 
 <section id="method">
   <div class="wrap">
